@@ -172,10 +172,15 @@ struct EditorView: View {
     /// `ScrollView` puede calcular un tamaño mucho mayor a la pantalla al no tener una
     /// propuesta de ancho concreta; pasar un `CGSize` ya resuelto evita ese problema.
     private func previewSize(fitting available: CGSize) -> CGSize {
+        // GeometryReader puede reportar (0, 0) en el primer instante de layout, antes de
+        // asentarse; sin este piso mínimo eso produce un ancho/alto negativo y un crash
+        // ("Invalid frame dimension") al pasarlo a .frame().
+        let safeWidth = max(available.width, 1)
+        let safeHeight = max(available.height, 1)
         let ratio = configuration.format.aspectRatio
-        let widthIfHeightConstrained = available.height * ratio
-        let width = min(available.width, widthIfHeightConstrained)
-        let height = width / ratio
+        let widthIfHeightConstrained = safeHeight * ratio
+        let width = max(min(safeWidth, widthIfHeightConstrained), 1)
+        let height = max(width / ratio, 1)
         return CGSize(width: width, height: height)
     }
 }
