@@ -11,33 +11,41 @@ struct EditorView: View {
     @State private var exportedImage: ShareableImage?
 
     var body: some View {
-        ZStack {
-            Theme.paper.ignoresSafeArea()
+        // El GeometryReader envuelve TODA la pantalla, fuera del ScrollView a propósito:
+        // un GeometryReader anidado directamente dentro del contenido de un ScrollView
+        // puede reportar un tamaño "ideal" incorrecto (un quirk conocido de SwiftUI) que
+        // hace que el ScrollView recorte el contenido a un tamaño distinto del que en
+        // realidad se dibuja. Midiendo la pantalla completa una sola vez, antes de entrar
+        // al ScrollView, se evita esa ambigüedad.
+        GeometryReader { screenGeometry in
+            let horizontalPadding: CGFloat = 32
+            let resolvedPreviewSize = previewSize(
+                fitting: CGSize(width: screenGeometry.size.width - horizontalPadding, height: 420)
+            )
 
-            ScrollView {
-                VStack(spacing: 24) {
-                    GeometryReader { geometry in
-                        let size = previewSize(fitting: geometry.size)
+            ZStack {
+                Theme.paper.ignoresSafeArea()
+
+                ScrollView {
+                    VStack(spacing: 24) {
                         HStack {
                             Spacer(minLength: 0)
                             FramePreviewView(photo: photo, exif: exif, configuration: configuration, isPro: subscriptionStore.isPro)
-                                .frame(width: size.width, height: size.height)
+                                .frame(width: resolvedPreviewSize.width, height: resolvedPreviewSize.height)
                             Spacer(minLength: 0)
                         }
-                    }
-                    .frame(height: 420)
-                    .padding(.horizontal)
-                    .padding(.top, 12)
+                        .padding(.top, 12)
 
-                    VStack(spacing: 20) {
-                        layoutControl
-                        formatControl
-                        colorControl
-                        sizeControl
-                        fieldsControl
+                        VStack(spacing: 20) {
+                            layoutControl
+                            formatControl
+                            colorControl
+                            sizeControl
+                            fieldsControl
+                        }
+                        .padding(.bottom, 32)
                     }
-                    .padding(.horizontal)
-                    .padding(.bottom, 32)
+                    .padding(.horizontal, horizontalPadding / 2)
                 }
             }
         }

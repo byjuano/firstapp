@@ -68,11 +68,16 @@ struct FramePreviewView: View {
                         .font(Theme.Font.mono(8))
                         .tracking(1.2)
                         .foregroundStyle(inkTone.opacity(0.65))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                 }
                 Text(settingsLine)
                     .font(Theme.Font.mono(11))
                     .foregroundStyle(inkTone)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
+            .padding(.horizontal, 6)
             .padding(.bottom, margin)
         }
     }
@@ -93,6 +98,8 @@ struct FramePreviewView: View {
                         .font(Theme.Font.display(13))
                         .italic()
                         .foregroundStyle(inkTone)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                 }
                 HStack(spacing: 14) {
                     ForEach(statFields, id: \.label) { stat in
@@ -101,9 +108,12 @@ struct FramePreviewView: View {
                                 .font(Theme.Font.mono(7))
                                 .tracking(0.8)
                                 .foregroundStyle(inkTone.opacity(0.6))
+                                .lineLimit(1)
                             Text(stat.value)
                                 .font(Theme.Font.mono(11))
                                 .foregroundStyle(inkTone)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
                         }
                     }
                 }
@@ -128,12 +138,17 @@ struct FramePreviewView: View {
                     Text(camera)
                         .font(Theme.Font.display(10))
                         .italic()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                 }
                 Text(settingsLine)
                     .font(Theme.Font.mono(8))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
             .foregroundStyle(isDarkFrame ? .white : .black)
             .padding(8)
+            .frame(maxWidth: 200, alignment: .leading)
             .background(.ultraThinMaterial)
             .clipShape(RoundedRectangle(cornerRadius: 4))
             .padding(10)
