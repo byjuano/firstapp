@@ -16,10 +16,15 @@ struct EditorView: View {
 
             ScrollView {
                 VStack(spacing: 24) {
-                    FramePreviewView(photo: photo, exif: exif, configuration: configuration, isPro: subscriptionStore.isPro)
-                        .frame(maxWidth: .infinity, maxHeight: 420)
-                        .padding(.horizontal)
-                        .padding(.top, 12)
+                    GeometryReader { geometry in
+                        let size = previewSize(fitting: geometry.size)
+                        FramePreviewView(photo: photo, exif: exif, configuration: configuration, isPro: subscriptionStore.isPro)
+                            .frame(width: size.width, height: size.height)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .frame(height: 420)
+                    .padding(.horizontal)
+                    .padding(.top, 12)
 
                     VStack(spacing: 20) {
                         layoutControl
@@ -149,6 +154,18 @@ struct EditorView: View {
         let image = FrameRenderer.render(photo: photo, exif: exif, configuration: configuration, isPro: subscriptionStore.isPro)
         libraryStore.save(image: image, configuration: configuration, exif: exif)
         exportedImage = ShareableImage(image: image)
+    }
+
+    /// Calcula un tamaño exacto (no ambiguo) que respeta `configuration.format.aspectRatio`
+    /// dentro del espacio disponible. `aspectRatio(contentMode: .fit)` dentro de un
+    /// `ScrollView` puede calcular un tamaño mucho mayor a la pantalla al no tener una
+    /// propuesta de ancho concreta; pasar un `CGSize` ya resuelto evita ese problema.
+    private func previewSize(fitting available: CGSize) -> CGSize {
+        let ratio = configuration.format.aspectRatio
+        let widthIfHeightConstrained = available.height * ratio
+        let width = min(available.width, widthIfHeightConstrained)
+        let height = width / ratio
+        return CGSize(width: width, height: height)
     }
 }
 
