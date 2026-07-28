@@ -5,6 +5,7 @@ struct EditorView: View {
     let exif: ExifData
 
     @EnvironmentObject private var subscriptionStore: SubscriptionStore
+    @EnvironmentObject private var libraryStore: FrameLibraryStore
     @State private var configuration = FrameConfiguration()
     @State private var isShowingPaywall = false
     @State private var exportedImage: ShareableImage?
@@ -146,6 +147,7 @@ struct EditorView: View {
 
     private func export() {
         let image = FrameRenderer.render(photo: photo, exif: exif, configuration: configuration, isPro: subscriptionStore.isPro)
+        libraryStore.save(image: image, configuration: configuration, exif: exif)
         exportedImage = ShareableImage(image: image)
     }
 }

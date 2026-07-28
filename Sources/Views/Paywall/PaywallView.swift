@@ -1,3 +1,4 @@
+import StoreKit
 import SwiftUI
 
 struct PaywallView: View {
@@ -42,19 +43,29 @@ struct PaywallView: View {
                         .padding(.horizontal)
 
                         VStack(spacing: 12) {
-                            Button {
-                                purchase(productID: SubscriptionStore.yearlyProductID)
-                            } label: {
-                                planRow(title: "Anual", price: "$29.99/año", detail: "equivale a $2.50/mes")
-                            }
-                            Button {
-                                purchase(productID: SubscriptionStore.monthlyProductID)
-                            } label: {
-                                planRow(title: "Mensual", price: "$4.99/mes", detail: nil)
+                            if subscriptionStore.products.isEmpty {
+                                Text("No se pudieron cargar los planes. Revisa la configuración de StoreKit en el esquema de Xcode.")
+                                    .font(.footnote)
+                                    .foregroundStyle(Theme.inkSoft)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal)
+                            } else {
+                                ForEach(subscriptionStore.products) { product in
+                                    Button {
+                                        purchase(productID: product.id)
+                                    } label: {
+                                        planRow(
+                                            title: product.displayName,
+                                            price: product.displayPrice,
+                                            detail: product.subscription?.subscriptionPeriod.aperioDetailLabel
+                                        )
+                                    }
+                                }
                             }
                         }
                         .padding(.horizontal)
                         .disabled(isPurchasing)
+                        .task { await subscriptionStore.loadProducts() }
                     }
                 }
             }
@@ -97,4 +108,14 @@ struct PaywallView: View {
 
 #Preview {
     PaywallView().environmentObject(SubscriptionStore())
+}
+
+private extension Product.SubscriptionPeriod {
+    var aperioDetailLabel: String? {
+        switch unit {
+        case .month where value == 1: return "por mes"
+        case .year where value == 1: return "por año"
+        default: return nil
+        }
+    }
 }
