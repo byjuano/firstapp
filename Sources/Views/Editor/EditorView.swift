@@ -18,9 +18,12 @@ struct EditorView: View {
                 VStack(spacing: 24) {
                     GeometryReader { geometry in
                         let size = previewSize(fitting: geometry.size)
-                        FramePreviewView(photo: photo, exif: exif, configuration: configuration, isPro: subscriptionStore.isPro)
-                            .frame(width: size.width, height: size.height)
-                            .frame(maxWidth: .infinity)
+                        HStack {
+                            Spacer(minLength: 0)
+                            FramePreviewView(photo: photo, exif: exif, configuration: configuration, isPro: subscriptionStore.isPro)
+                                .frame(width: size.width, height: size.height)
+                            Spacer(minLength: 0)
+                        }
                     }
                     .frame(height: 420)
                     .padding(.horizontal)
