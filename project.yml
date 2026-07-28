@@ -1,0 +1,64 @@
+name: Aperio
+options:
+  bundleIdPrefix: com.aperio
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+
+targets:
+  Aperio:
+    type: application
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: Sources
+    resources:
+      - path: Resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.aperio.app
+        PRODUCT_NAME: Aperio
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        IPHONEOS_DEPLOYMENT_TARGET: "16.0"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ENABLE_PREVIEWS: true
+    info:
+      properties:
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        NSPhotoLibraryUsageDescription: "Aperio necesita acceder a tus fotos para crear el frame."
+        NSPhotoLibraryAddUsageDescription: "Aperio guarda el frame terminado en tu galería de fotos."
+        NSLocationWhenInUseUsageDescription: "Aperio puede mostrar dónde se tomó la foto si esa opción está activada en el editor."
+    entitlements:
+      path: Sources/App/Aperio.entitlements
+      properties:
+        com.apple.security.application-groups: []
+
+  AperioTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: Tests/AperioTests
+    dependencies:
+      - target: Aperio
+    settings:
+      base:
+        SWIFT_VERSION: "5.0"
+
+schemes:
+  Aperio:
+    build:
+      targets:
+        Aperio: all
+        AperioTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - AperioTests
+    archive:
+      config: Release
