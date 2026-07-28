@@ -17,7 +17,7 @@ struct EditorView: View {
             ScrollView {
                 VStack(spacing: 24) {
                     FramePreviewView(photo: photo, exif: exif, configuration: configuration, isPro: subscriptionStore.isPro)
-                        .frame(maxHeight: 420)
+                        .frame(maxWidth: .infinity, maxHeight: 420)
                         .padding(.horizontal)
                         .padding(.top, 12)
 
