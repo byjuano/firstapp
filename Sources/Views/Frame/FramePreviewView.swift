@@ -89,13 +89,13 @@ struct FramePreviewView: View {
             VStack(alignment: .leading, spacing: geo.unit * 0.6) {
                 if let camera = content.cameraLine {
                     Text(camera.uppercased())
-                        .font(Theme.Font.mono(geo.unit * 2.4 * resolved.textScaleValue))
+                        .font(Theme.Font.mono(geo.unit * 3.4 * resolved.textScaleValue))
                         .foregroundStyle(Theme.ink)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
                 }
                 Text(content.settingsLine)
-                    .font(Theme.Font.mono(geo.unit * 2.1 * resolved.textScaleValue))
+                    .font(Theme.Font.mono(geo.unit * 3.0 * resolved.textScaleValue))
                     .foregroundStyle(dataTextColor)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
@@ -135,11 +135,11 @@ struct FramePreviewView: View {
                 ForEach(content.stats) { stat in
                     VStack(alignment: .leading, spacing: geo.unit * 0.4) {
                         Text(stat.label)
-                            .font(Theme.Font.mono(geo.unit * 1.5 * resolved.textScaleValue))
+                            .font(Theme.Font.mono(geo.unit * 2.0 * resolved.textScaleValue))
                             .foregroundStyle(Theme.accent)
                             .lineLimit(1)
                         Text(stat.value)
-                            .font(Theme.Font.mono(geo.unit * 2.3 * resolved.textScaleValue, weight: .semibold))
+                            .font(Theme.Font.mono(geo.unit * 4.2 * resolved.textScaleValue, weight: .semibold))
                             .foregroundStyle(Theme.ink)
                             .lineLimit(1)
                             .minimumScaleFactor(0.6)
@@ -167,14 +167,14 @@ struct FramePreviewView: View {
         VStack(spacing: geo.unit * 0.8) {
             if let camera = content.cameraLine {
                 Text(camera)
-                    .font(Theme.Font.display(geo.unit * 3.2 * resolved.textScaleValue))
+                    .font(Theme.Font.display(geo.unit * 4.2 * resolved.textScaleValue))
                     .italic()
                     .foregroundStyle(Theme.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
             }
             Text(content.settingsLine)
-                .font(Theme.Font.mono(geo.unit * 1.9 * resolved.textScaleValue))
+                .font(Theme.Font.mono(geo.unit * 2.8 * resolved.textScaleValue))
                 .foregroundStyle(dataTextColor)
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
@@ -201,10 +201,12 @@ struct FramePreviewView: View {
     }
 
     private func watermark(_ geo: FrameGeometry) -> some View {
-        Text("Aperio")
-            .font(Theme.Font.mono(geo.unit * 1.5))
-            .tracking(geo.unit * 0.12)
-            .foregroundStyle(Theme.ink.opacity(0.5))
+        Text(FrameContent.watermarkText)
+            .font(Theme.Font.mono(geo.unit * 1.9))
+            .tracking(geo.unit * 0.1)
+            .foregroundStyle(Theme.ink.opacity(0.55))
+            .lineLimit(1)
+            .minimumScaleFactor(0.6)
     }
 }
 

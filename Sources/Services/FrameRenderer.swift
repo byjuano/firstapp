@@ -106,12 +106,12 @@ enum FrameRenderer {
         let maxWidth = geo.canvas.width * 0.72
 
         if let camera = content.cameraLine {
-            let font = UIFont.monospacedSystemFont(ofSize: geo.unit * 2.4 * configuration.textScaleValue, weight: .regular)
+            let font = UIFont.monospacedSystemFont(ofSize: geo.unit * 3.4 * configuration.textScaleValue, weight: .regular)
             draw(camera.uppercased(), at: CGPoint(x: left, y: cursor), width: maxWidth, font: font, color: UIColor.Aperio.ink, alignment: .left)
             cursor += font.lineHeight + geo.unit * 0.6
         }
 
-        let settingsFont = UIFont.monospacedSystemFont(ofSize: geo.unit * 2.1 * configuration.textScaleValue, weight: .regular)
+        let settingsFont = UIFont.monospacedSystemFont(ofSize: geo.unit * 3.0 * configuration.textScaleValue, weight: .regular)
         draw(content.settingsLine, at: CGPoint(x: left, y: cursor), width: maxWidth, font: settingsFont, color: dataColor(configuration), alignment: .left)
         cursor += settingsFont.lineHeight + geo.unit * 0.6
 
@@ -123,9 +123,9 @@ enum FrameRenderer {
         if content.showWatermark {
             // Va a la derecha, del lado opuesto a la lectura técnica, para que
             // las dos esquinas del bloque de datos queden balanceadas.
-            let font = UIFont.monospacedSystemFont(ofSize: geo.unit * 1.5, weight: .regular)
+            let font = UIFont.monospacedSystemFont(ofSize: geo.unit * 1.9, weight: .regular)
             draw(
-                "Aperio",
+                FrameContent.watermarkText,
                 at: CGPoint(x: left, y: geo.dataRect.midY - geo.unit * 1),
                 width: geo.canvas.width - left * 2,
                 font: font,
@@ -165,8 +165,8 @@ enum FrameRenderer {
         context.fill(CGRect(x: bar.minX, y: bar.minY, width: bar.width, height: max(geo.unit * 0.4, 1)))
 
         let padding = geo.unit * 7
-        let labelFont = UIFont.monospacedSystemFont(ofSize: geo.unit * 1.5 * configuration.textScaleValue, weight: .regular)
-        let valueFont = UIFont.monospacedSystemFont(ofSize: geo.unit * 2.3 * configuration.textScaleValue, weight: .semibold)
+        let labelFont = UIFont.monospacedSystemFont(ofSize: geo.unit * 2.0 * configuration.textScaleValue, weight: .regular)
+        let valueFont = UIFont.monospacedSystemFont(ofSize: geo.unit * 3.2 * configuration.textScaleValue, weight: .semibold)
         let blockHeight = labelFont.lineHeight + valueFont.lineHeight + geo.unit * 0.4
         let top = bar.midY - blockHeight / 2
 
@@ -189,8 +189,8 @@ enum FrameRenderer {
             rightCursor += font.lineHeight + geo.unit * 0.4
         }
         if content.showWatermark {
-            let font = UIFont.monospacedSystemFont(ofSize: geo.unit * 1.5, weight: .regular)
-            draw("Aperio", at: CGPoint(x: rightX, y: rightCursor), width: rightWidth, font: font, color: UIColor.Aperio.ink.withAlphaComponent(0.5), alignment: .right)
+            let font = UIFont.monospacedSystemFont(ofSize: geo.unit * 1.9, weight: .regular)
+            draw(FrameContent.watermarkText, at: CGPoint(x: rightX, y: rightCursor), width: rightWidth, font: font, color: UIColor.Aperio.ink.withAlphaComponent(0.5), alignment: .right)
         }
     }
 
@@ -207,12 +207,12 @@ enum FrameRenderer {
         var cursor = geo.dataRect.midY - geo.unit * 5
 
         if let camera = content.cameraLine {
-            let font = serifFont(ofSize: geo.unit * 3.2 * configuration.textScaleValue, italic: true)
+            let font = serifFont(ofSize: geo.unit * 4.2 * configuration.textScaleValue, italic: true)
             draw(camera, at: CGPoint(x: x, y: cursor), width: width, font: font, color: UIColor.Aperio.ink, alignment: .center)
             cursor += font.lineHeight + geo.unit * 0.8
         }
 
-        let settingsFont = UIFont.monospacedSystemFont(ofSize: geo.unit * 1.9 * configuration.textScaleValue, weight: .regular)
+        let settingsFont = UIFont.monospacedSystemFont(ofSize: geo.unit * 2.8 * configuration.textScaleValue, weight: .regular)
         draw(content.settingsLine, at: CGPoint(x: x, y: cursor), width: width, font: settingsFont, color: dataColor(configuration), alignment: .center)
         cursor += settingsFont.lineHeight + geo.unit * 0.8
 
@@ -223,8 +223,8 @@ enum FrameRenderer {
         }
 
         if content.showWatermark {
-            let font = UIFont.monospacedSystemFont(ofSize: geo.unit * 1.5, weight: .regular)
-            draw("Aperio", at: CGPoint(x: x, y: cursor), width: width, font: font, color: UIColor.Aperio.ink.withAlphaComponent(0.5), alignment: .center)
+            let font = UIFont.monospacedSystemFont(ofSize: geo.unit * 1.9, weight: .regular)
+            draw(FrameContent.watermarkText, at: CGPoint(x: x, y: cursor), width: width, font: font, color: UIColor.Aperio.ink.withAlphaComponent(0.5), alignment: .center)
         }
     }
 

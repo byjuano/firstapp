@@ -13,6 +13,10 @@ struct FrameContent {
         var id: String { label }
     }
 
+    /// El texto de la marca de agua del plan gratis, en un solo lugar para que
+    /// la vista previa y la exportación no puedan mostrar cosas distintas.
+    static let watermarkText = "CREADO CON APERIO"
+
     let stats: [Stat]
     let cameraLine: String?
     let settingsLine: String
