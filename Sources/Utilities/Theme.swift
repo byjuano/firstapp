@@ -1,43 +1,63 @@
 import SwiftUI
-import UIKit
 
-/// Tokens de marca de Aperio: los mismos definidos en el spec de producto
-/// (papel cálido / tinta cerca del negro / acento burdeos), con variante para modo oscuro.
-/// Se definen en código (no en el catálogo de assets) para no depender de que el
-/// recurso quede correctamente incluido en el target al generar el proyecto.
+/// Tokens de marca de Aperio.
+///
+/// La app está comprometida con un solo modo, oscuro: no se adapta al tema del
+/// sistema. Es una decisión de identidad, no un descuido. Una foto se juzga
+/// mejor sobre negro, y el fondo claro competía con la imagen.
+///
+/// El ámbar está reservado para lo que pertenece al plan Pro. Al no usarlo en
+/// ningún otro lado, el usuario aprende de un vistazo qué es de pago sin tener
+/// que leer etiquetas.
 enum Theme {
-    static let paper = Color(light: (0xED, 0xEA, 0xE4), dark: (0x15, 0x12, 0x0E))
-    static let paperRaised = Color(light: (0xF7, 0xF5, 0xF0), dark: (0x1E, 0x1A, 0x15))
-    static let ink = Color(light: (0x1C, 0x18, 0x15), dark: (0xF1, 0xEC, 0xE3))
-    static let inkSoft = Color(light: (0x5B, 0x56, 0x4E), dark: (0xB6, 0xAE, 0xA0))
-    static let accent = Color(light: (0x7C, 0x2A, 0x34), dark: (0xE1, 0x7E, 0x86))
+    static let void = Color(rgb: 0x000000)
+    static let panel = Color(rgb: 0x0A0A0A)
+    static let panelRaised = Color(rgb: 0x111111)
+    static let hairline = Color(rgb: 0x262626)
+    static let ink = Color(rgb: 0xF5F5F2)
+    static let inkDim = Color(rgb: 0x6B6B6E)
+    static let inkFaint = Color(rgb: 0x3A3A3C)
+    static let accent = Color(rgb: 0xC9A961)
+    static let accentDim = Color(rgb: 0x4A3F26)
 
     enum Font {
-        /// New York (el serif del sistema de Apple), para títulos con carácter editorial.
+        /// New York, el serif del sistema, para títulos con carácter editorial.
         static func display(_ size: CGFloat, weight: SwiftUI.Font.Weight = .medium) -> SwiftUI.Font {
             .system(size: size, weight: weight, design: .serif)
         }
 
-        /// SF Mono (el monospace del sistema), para datos técnicos y etiquetas.
+        /// SF Mono, para todo dato técnico: es como los muestra una cámara.
         static func mono(_ size: CGFloat, weight: SwiftUI.Font.Weight = .regular) -> SwiftUI.Font {
             .system(size: size, weight: weight, design: .monospaced)
         }
     }
 }
 
-private extension Color {
-    /// Un color dinámico claro/oscuro a partir de componentes RGB de 8 bits (0-255),
-    /// sin pasar por el catálogo de assets.
-    init(light: (UInt8, UInt8, UInt8), dark: (UInt8, UInt8, UInt8)) {
-        let uiColor = UIColor { traits in
-            let components = traits.userInterfaceStyle == .dark ? dark : light
-            return UIColor(
-                red: CGFloat(components.0) / 255,
-                green: CGFloat(components.1) / 255,
-                blue: CGFloat(components.2) / 255,
-                alpha: 1
-            )
-        }
-        self.init(uiColor: uiColor)
+extension Color {
+    init(rgb: UInt32) {
+        self.init(
+            red: Double((rgb >> 16) & 0xFF) / 255,
+            green: Double((rgb >> 8) & 0xFF) / 255,
+            blue: Double(rgb & 0xFF) / 255
+        )
+    }
+}
+
+extension UIColor {
+    convenience init(rgb: UInt32) {
+        self.init(
+            red: CGFloat((rgb >> 16) & 0xFF) / 255,
+            green: CGFloat((rgb >> 8) & 0xFF) / 255,
+            blue: CGFloat(rgb & 0xFF) / 255,
+            alpha: 1
+        )
+    }
+
+    /// Los mismos tokens que `Theme`, para el render final en Core Graphics.
+    enum Aperio {
+        static let void = UIColor(rgb: 0x000000)
+        static let ink = UIColor(rgb: 0xF5F5F2)
+        static let inkDim = UIColor(rgb: 0x9A9A9E)
+        static let accent = UIColor(rgb: 0xC9A961)
     }
 }

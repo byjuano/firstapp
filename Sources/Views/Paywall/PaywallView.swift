@@ -7,27 +7,28 @@ struct PaywallView: View {
     @State private var isPurchasing = false
 
     private let benefits = [
-        "Color y tamaño de marco personalizables",
-        "Fecha, hora y ubicación en el frame",
-        "Nombre o logo del fotógrafo",
+        "Tu nombre y tu logo sobre la foto",
+        "Fecha, hora y ubicación",
+        "Tinte y tamaño del texto",
+        "Estilo de las bandas",
+        "Presets guardados",
         "Sin marca de agua de Aperio",
-        "Lote ilimitado",
-        "Sincronización con iCloud",
+        "Lote ilimitado y sincronización con iCloud",
     ]
 
     var body: some View {
         NavigationStack {
             ZStack {
-                Theme.paper.ignoresSafeArea()
+                Theme.void.ignoresSafeArea()
                 ScrollView {
                     VStack(spacing: 24) {
                         VStack(spacing: 6) {
                             Text("Aperio Pro")
                                 .font(Theme.Font.display(28))
                                 .italic()
-                            Text("Personalización completa del marco")
+                            Text("Que la foto se vea tuya")
                                 .font(.subheadline)
-                                .foregroundStyle(Theme.inkSoft)
+                                .foregroundStyle(Theme.inkDim)
                         }
                         .padding(.top, 16)
 
@@ -39,14 +40,14 @@ struct PaywallView: View {
                         }
                         .padding(20)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Theme.paperRaised, in: RoundedRectangle(cornerRadius: 12))
+                        .background(Theme.panelRaised, in: RoundedRectangle(cornerRadius: 12))
                         .padding(.horizontal)
 
                         VStack(spacing: 12) {
                             if subscriptionStore.products.isEmpty {
                                 Text("No se pudieron cargar los planes. Revisa la configuración de StoreKit en el esquema de Xcode.")
                                     .font(.footnote)
-                                    .foregroundStyle(Theme.inkSoft)
+                                    .foregroundStyle(Theme.inkDim)
                                     .multilineTextAlignment(.center)
                                     .padding(.horizontal)
                             } else {
@@ -84,7 +85,7 @@ struct PaywallView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.headline)
                 if let detail {
-                    Text(detail).font(.caption).foregroundStyle(Theme.inkSoft)
+                    Text(detail).font(.caption).foregroundStyle(Theme.inkDim)
                 }
             }
             Spacer()
@@ -92,7 +93,7 @@ struct PaywallView: View {
         }
         .padding()
         .foregroundStyle(Theme.ink)
-        .background(Theme.paperRaised, in: RoundedRectangle(cornerRadius: 10))
+        .background(Theme.panelRaised, in: RoundedRectangle(cornerRadius: 10))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.accent.opacity(0.4)))
     }
 

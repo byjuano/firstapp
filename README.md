@@ -29,31 +29,45 @@ Cada vez que se edite `project.yml` (por ejemplo, al agregar un target nuevo o c
 ```
 Sources/
   App/                  Entry point (AperioApp.swift) e Info.plist generado
-  Models/                FrameLayout, ExportFormat, ExifData, FrameConfiguration
+  Models/
+    FrameLayout.swift     Visor, Claqueta, Créditos
+    FrameFit.swift        Recortar o foto completa con bandas
+    FrameGeometry.swift   Dónde va la foto y dónde la banda (compartido)
+    FrameContent.swift    Los textos ya resueltos desde el EXIF (compartido)
+    FrameConfiguration.swift  Toda la configuración + el gating de Pro
+    ExportFormat.swift, ExifData.swift, SavedFrame.swift
   Services/
     ExifReader.swift     Lee EXIF/GPS de la foto con ImageIO
     FrameRenderer.swift  Compone la imagen final (Core Graphics) para exportar
-    SubscriptionStore.swift  Estado de Aperio Pro (StoreKit 2 pendiente de conectar)
+    FrameLibraryStore.swift  Persiste las fotos ya exportadas
+    SubscriptionStore.swift  Estado de Aperio Pro vía StoreKit 2
   Utilities/
-    Theme.swift           Tokens de marca: colores y tipografía (New York + SF Mono)
+    Theme.swift           Tokens de marca: negro, ámbar, New York + SF Mono
   Views/
     RootView.swift
     Onboarding/WelcomeView.swift
     Library/LibraryView.swift
     Import/PhotoPickerView.swift    Selector de fotos (PhotosUI) + lectura de EXIF
-    Editor/EditorView.swift          Diseño, formato, sliders de color/tamaño, campos
+    Editor/EditorView.swift          Controles a medida, vista previa fija
     Frame/FramePreviewView.swift     Preview en vivo de las 3 plantillas
     Paywall/PaywallView.swift
-Tests/AperioTests/        Tests unitarios de los modelos
+Tests/AperioTests/        Tests de los modelos y de la geometría
 ```
 
-## Estado actual (v0.1 del código)
+### Dos piezas centrales
+
+`FrameGeometry` y `FrameContent` son consumidas tanto por la vista previa (SwiftUI) como por el render final (Core Graphics). Antes cada una calculaba su propio layout y armaba sus propios textos, que es la forma más segura de que lo que el usuario ve y lo que exporta se separen sin que nadie lo note. Al tocar el layout de una plantilla, hay que hacerlo en `FrameGeometry`, no en las vistas.
+
+Todos los tamaños se expresan en `geo.unit` (1% del ancho del lienzo), así la vista previa de 300pt y la exportación de 1080px producen la misma composición.
+
+## Estado actual (v0.2 del código)
 
 Ya implementado:
-- Los 3 diseños del v1 (Línea, Ficha, Esquina), tanto en preview en vivo (SwiftUI) como en export final (Core Graphics).
+- Los 3 diseños del v1 (Visor, Claqueta, Créditos), tanto en preview en vivo (SwiftUI) como en export final (Core Graphics).
+- Los 2 encuadres (recortar o foto completa con bandas), con la regla de que al haber bandas los datos bajan a la banda y desaparece el degradado, que solo existía para dar contraste sobre la foto.
 - Lectura automática de EXIF (cámara, lente, ISO, apertura, velocidad, focal, fecha, GPS) vía ImageIO.
 - Los 4 formatos de exportación (Feed, Vertical, Horizontal, Stories), todos en el plan gratis.
-- Gating de plan: color y tamaño de marco personalizables, campos extra (fecha/hora/ubicación, nombre o logo) y remoción de marca de agua quedan detrás de `SubscriptionStore.isPro`.
+- Gating de plan centralizado en `FrameConfiguration.resolved(isPro:)`: tinte y tamaño del texto, firma del fotógrafo, ubicación y marca de agua. Al estar en un solo lugar, la vista previa y el render no pueden aplicarlo de forma distinta.
 - Paywall con los dos planes (mensual/anual), usando `Product` reales de StoreKit 2 (no precios hardcodeados).
 - `SubscriptionStore` conectado a StoreKit 2: carga de productos, compra, escucha de `Transaction.updates` y `isPro` derivado de las entitlements vigentes.
 - Biblioteca persistente: `FrameLibraryStore` guarda cada frame exportado (thumbnail + configuración) en el directorio de Documentos, y `LibraryView` muestra la grilla real.
@@ -61,8 +75,13 @@ Ya implementado:
 Para probar las compras localmente sin depender de App Store Connect: en Xcode, `File > New > File > StoreKit Configuration File`, agregar los dos productos (`com.aperio.app.pro.monthly`, `com.aperio.app.pro.yearly`) como suscripciones auto-renovables, y seleccionar ese archivo en `Product > Scheme > Edit Scheme > Run > Options > StoreKit Configuration`.
 
 Pendiente (siguientes pasos):
+- Estilo de las bandas (hoy siempre negras; falta blanco y la foto desenfocada de fondo).
+- Posición configurable del bloque de datos.
 - Selección y exportación en lote.
 - Presets guardados por el usuario.
 - Sincronización con iCloud.
+- Logo del fotógrafo (hoy la firma es solo texto).
 - Ícono de app y pantalla de lanzamiento reales (hoy `AppIcon.appiconset` está vacío).
+
+> Nota: este código se escribe sin poder compilarlo (el entorno de desarrollo es Linux, sin Xcode). Los errores de compilación se detectan al abrirlo en una Mac, no antes.
 - Crear los productos de suscripción en App Store Connect antes de probar compras reales (más allá del StoreKit Configuration File local).

@@ -4,16 +4,16 @@ struct WelcomeView: View {
     let onFinish: () -> Void
 
     private let pages: [(title: String, subtitle: String)] = [
-        ("Enmarca tu foto", "Elige un diseño minimalista y aplícalo en segundos."),
-        ("Cuenta cómo la tomaste", "Aperio lee el ISO, la apertura, la velocidad y la focal directo del EXIF."),
-        ("Compártela con estilo", "Exportá lista para Feed, Vertical, Horizontal o Stories."),
+        ("Tus ajustes, sobre la foto", "El ISO, la apertura, la velocidad y el lente salen solos del archivo."),
+        ("Tres formas de contarlo", "Sobre la imagen o en la banda, según lo que pida cada toma."),
+        ("Lista para publicar", "Feed, Vertical, Horizontal y Stories, sin recortar la foto."),
     ]
 
     @State private var pageIndex = 0
 
     var body: some View {
         ZStack {
-            Theme.paper.ignoresSafeArea()
+            Theme.void.ignoresSafeArea()
             VStack(spacing: 32) {
                 TabView(selection: $pageIndex) {
                     ForEach(Array(pages.enumerated()), id: \.offset) { index, page in
@@ -24,7 +24,7 @@ struct WelcomeView: View {
                                 .multilineTextAlignment(.center)
                             Text(page.subtitle)
                                 .font(.body)
-                                .foregroundStyle(Theme.inkSoft)
+                                .foregroundStyle(Theme.inkDim)
                                 .multilineTextAlignment(.center)
                                 .padding(.horizontal, 32)
                         }
@@ -39,7 +39,7 @@ struct WelcomeView: View {
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .foregroundStyle(Theme.paper)
+                        .foregroundStyle(Theme.void)
                         .background(Theme.ink, in: RoundedRectangle(cornerRadius: 10))
                 }
                 .padding(.horizontal, 32)

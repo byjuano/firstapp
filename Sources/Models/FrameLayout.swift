@@ -1,29 +1,33 @@
 import Foundation
 
-/// Los 3 diseños de marco disponibles en el v1, todos incluidos en el plan gratis.
+/// Los 3 diseños del v1, todos incluidos en el plan gratis.
+///
+/// Los tres parten de la misma idea: los datos viven sobre la imagen, no
+/// alrededor de ella. No hay marco, así que no hay color ni grosor de marco
+/// que configurar.
 enum FrameLayout: String, CaseIterable, Identifiable, Codable {
-    case linea
-    case ficha
-    case esquina
+    /// Brackets de esquina y una lectura técnica, como el punto de foco de un visor.
+    case visor
+    /// Franja sólida con los números en monoespaciado, como una claqueta de rodaje.
+    case claqueta
+    /// Texto centrado, como los créditos finales de una película.
+    case creditos
 
     var id: String { rawValue }
 
     var displayName: String {
         switch self {
-        case .linea: return "Línea"
-        case .ficha: return "Ficha"
-        case .esquina: return "Esquina"
+        case .visor: return "Visor"
+        case .claqueta: return "Claqueta"
+        case .creditos: return "Créditos"
         }
     }
 
     var summary: String {
         switch self {
-        case .linea:
-            return "Margen fino y una línea de datos debajo de la foto."
-        case .ficha:
-            return "Franja inferior con los datos organizados en grilla."
-        case .esquina:
-            return "Sin marco: los datos se apoyan sobre la foto, en una esquina."
+        case .visor: return "Brackets de esquina y lectura técnica."
+        case .claqueta: return "Franja con los datos, densa y legible."
+        case .creditos: return "Texto centrado, sobrio."
         }
     }
 }

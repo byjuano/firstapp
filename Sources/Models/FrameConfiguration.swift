@@ -1,7 +1,8 @@
+import CoreGraphics
 import Foundation
 
-/// Qué datos EXIF se muestran en el marco. Los básicos están en el plan gratis;
-/// fecha/ubicación y nombre o logo del fotógrafo requieren Pro.
+/// Qué datos se muestran. Los de la toma son gratis; la ubicación y la firma
+/// del fotógrafo pertenecen a Pro.
 struct VisibleFields: Codable, Equatable {
     var iso = true
     var aperture = true
@@ -12,31 +13,56 @@ struct VisibleFields: Codable, Equatable {
     var photographerCredit = false
 }
 
-/// Posición del marco en el eje claro-oscuro. 0 = marco más claro, 1 = marco más oscuro.
-/// El plan gratis solo permite los extremos (0 o 1); Pro habilita cualquier valor intermedio.
-struct FrameColor: Codable, Equatable {
-    var position: Double = 0.0
+/// Color del texto de los datos. Reemplaza al viejo "color del marco": ahora que
+/// no hay marco, lo que se puede teñir es la tipografía.
+enum AccentTint: String, CaseIterable, Identifiable, Codable {
+    case neutro
+    case ambar
+    case blanco
 
-    static let light = FrameColor(position: 0.0)
-    static let dark = FrameColor(position: 1.0)
+    var id: String { rawValue }
 
-    /// Ajusta la posición al extremo más cercano, para cuando el usuario no tiene Pro.
-    func clampedToFreeTier() -> FrameColor {
-        FrameColor(position: position < 0.5 ? 0.0 : 1.0)
+    var displayName: String {
+        switch self {
+        case .neutro: return "Neutro"
+        case .ambar: return "Ámbar"
+        case .blanco: return "Blanco"
+        }
     }
 }
 
-/// Todo lo necesario para renderizar un frame: la elección de diseño, formato,
-/// personalización de marco y qué campos mostrar.
+/// Todo lo necesario para componer una imagen: plantilla, formato, encuadre,
+/// qué datos se muestran y los ajustes de Pro.
 struct FrameConfiguration: Codable, Equatable {
-    var layout: FrameLayout = .linea
+    var layout: FrameLayout = .visor
     var format: ExportFormat = .feed
-    var color: FrameColor = .light
-    /// 0 = margen mínimo, 1 = margen máximo. Fijo en el plan gratis (ver `FrameSizeSlider`).
-    var sizeFraction: Double = 0.3
+    var fit: FrameFit = .recortar
     var visibleFields = VisibleFields()
-    var photographerName: String = ""
-    var showPhotographerCredit = false
 
-    static let defaultFreeSize: Double = 0.3
+    // Ajustes de Pro. Cuando el usuario no tiene suscripción se ignoran y se
+    // usan los valores por defecto (ver `resolved(isPro:)`), en vez de
+    // deshabilitar los controles en cada vista.
+    var accent: AccentTint = .neutro
+    /// Multiplicador del cuerpo del texto. 1.0 es el tamaño base de la plantilla.
+    var textScale: Double = 1.0
+    var photographerName: String = ""
+
+    static let defaultTextScale: Double = 1.0
+
+    /// El multiplicador como `CGFloat`, que es lo que esperan los cálculos de
+    /// tamaño. Evita mezclar `Double` y `CGFloat` en cada multiplicación.
+    var textScaleValue: CGFloat { CGFloat(textScale) }
+
+    /// La configuración efectiva según el plan. Centralizar esto acá evita que
+    /// la vista previa y el render final apliquen el gating de forma distinta.
+    func resolved(isPro: Bool) -> FrameConfiguration {
+        guard !isPro else { return self }
+        var free = self
+        free.accent = .neutro
+        free.textScale = Self.defaultTextScale
+        free.photographerName = ""
+        free.visibleFields.dateTimeAndLocation = false
+        free.visibleFields.photographerCredit = false
+        return free
+    }
 }

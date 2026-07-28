@@ -1,235 +1,289 @@
 import CoreGraphics
 import UIKit
 
-/// Compone la imagen final (foto + marco + datos) para exportar, según el `FrameConfiguration`.
-/// El preview en vivo del editor se dibuja aparte en SwiftUI (ver `FramePreviewView`);
-/// este renderer es el que produce el archivo que se comparte o se guarda.
+/// Compone la imagen final que se comparte o se guarda.
+///
+/// Comparte `FrameGeometry` y `FrameContent` con la vista previa, así que el
+/// layout y los textos no pueden divergir. Lo único propio de acá es el dibujo.
 enum FrameRenderer {
     static func render(
         photo: UIImage,
         exif: ExifData,
-        configuration: FrameConfiguration,
+        configuration rawConfiguration: FrameConfiguration,
         isPro: Bool
     ) -> UIImage {
-        let canvasWidth = configuration.format.exportWidthPixels
-        let canvasHeight = canvasWidth / configuration.format.aspectRatio
-        let canvasSize = CGSize(width: canvasWidth, height: canvasHeight)
+        let configuration = rawConfiguration.resolved(isPro: isPro)
+        let content = FrameContent(exif: exif, configuration: rawConfiguration, isPro: isPro)
 
-        let colorPosition = isPro ? configuration.color.position : configuration.color.clampedToFreeTier().position
-        let sizeFraction = isPro ? configuration.sizeFraction : FrameConfiguration.defaultFreeSize
+        let width = configuration.format.exportWidthPixels
+        let canvas = CGSize(width: width, height: width / configuration.format.aspectRatio)
+        let geo = FrameGeometry.compute(
+            canvas: canvas,
+            photoAspect: photo.size.height > 0 ? photo.size.width / photo.size.height : 1,
+            configuration: configuration
+        )
 
-        let backgroundColor = UIColor.frameTone(atPosition: colorPosition)
-        let inkColor = UIColor(white: colorPosition < 0.5 ? 0.11 : 0.94, alpha: 1)
-
-        let renderer = UIGraphicsImageRenderer(size: canvasSize)
+        let renderer = UIGraphicsImageRenderer(size: canvas)
         return renderer.image { context in
-            backgroundColor.setFill()
-            context.fill(CGRect(origin: .zero, size: canvasSize))
+            UIColor.Aperio.void.setFill()
+            context.fill(CGRect(origin: .zero, size: canvas))
+
+            photo.drawAspectFilled(in: geo.photoRect, context: context)
+
+            if geo.needsScrim {
+                drawScrim(geo: geo, context: context)
+            }
 
             switch configuration.layout {
-            case .linea:
-                drawLinea(photo: photo, exif: exif, configuration: configuration, canvasSize: canvasSize, sizeFraction: sizeFraction, ink: inkColor, background: backgroundColor, context: context)
-            case .ficha:
-                drawFicha(photo: photo, exif: exif, configuration: configuration, canvasSize: canvasSize, ink: inkColor, background: backgroundColor, context: context)
-            case .esquina:
-                drawEsquina(photo: photo, exif: exif, configuration: configuration, canvasSize: canvasSize, isDarkFrame: colorPosition >= 0.5, context: context)
-            }
-
-            if !isPro {
-                drawWatermark(canvasSize: canvasSize, ink: inkColor, context: context)
+            case .visor: drawVisor(geo: geo, content: content, configuration: configuration, context: context)
+            case .claqueta: drawClaqueta(geo: geo, content: content, configuration: configuration, context: context)
+            case .creditos: drawCreditos(geo: geo, content: content, configuration: configuration, context: context)
             }
         }
     }
 
-    // MARK: - Línea: margen fino + una línea de datos debajo
+    // MARK: - Fondo
 
-    private static func drawLinea(
-        photo: UIImage,
-        exif: ExifData,
-        configuration: FrameConfiguration,
-        canvasSize: CGSize,
-        sizeFraction: Double,
-        ink: UIColor,
-        background: UIColor,
-        context: UIGraphicsImageRendererContext
-    ) {
-        let margin = canvasSize.width * CGFloat(0.02 + sizeFraction * 0.05)
-        let captionHeight = canvasSize.height * 0.12
-        let photoRect = CGRect(
-            x: margin,
-            y: margin,
-            width: canvasSize.width - margin * 2,
-            height: canvasSize.height - margin * 2 - captionHeight
-        )
-        photo.aspectFilled(in: photoRect, context: context)
-        ink.withAlphaComponent(0.9).setStroke()
-        UIBezierPath(rect: photoRect).stroke()
+    private static func drawScrim(geo: FrameGeometry, context: UIGraphicsImageRendererContext) {
+        let height = geo.canvas.height * 0.36
+        let rect = CGRect(x: 0, y: geo.canvas.height - height, width: geo.canvas.width, height: height)
+        let colors = [UIColor.black.withAlphaComponent(0).cgColor, UIColor.black.withAlphaComponent(0.82).cgColor]
+        guard let gradient = CGGradient(
+            colorsSpace: CGColorSpaceCreateDeviceRGB(),
+            colors: colors as CFArray,
+            locations: [0, 1]
+        ) else { return }
 
-        let captionRect = CGRect(
-            x: margin,
-            y: photoRect.maxY + margin * 0.4,
-            width: canvasSize.width - margin * 2,
-            height: captionHeight
+        context.cgContext.saveGState()
+        context.cgContext.clip(to: rect)
+        context.cgContext.drawLinearGradient(
+            gradient,
+            start: CGPoint(x: 0, y: rect.minY),
+            end: CGPoint(x: 0, y: rect.maxY),
+            options: []
         )
-        draw(
-            text: settingsLine(exif: exif, configuration: configuration),
-            centeredIn: captionRect,
-            font: .monospacedSystemFont(ofSize: canvasSize.width * 0.024, weight: .regular),
-            color: ink
-        )
+        context.cgContext.restoreGState()
     }
 
-    // MARK: - Ficha: franja inferior con grilla de datos
+    // MARK: - Visor
 
-    private static func drawFicha(
-        photo: UIImage,
-        exif: ExifData,
+    private static func drawVisor(
+        geo: FrameGeometry,
+        content: FrameContent,
         configuration: FrameConfiguration,
-        canvasSize: CGSize,
-        ink: UIColor,
-        background: UIColor,
         context: UIGraphicsImageRendererContext
     ) {
-        let bandHeight = canvasSize.height * 0.22
-        let photoRect = CGRect(x: 0, y: 0, width: canvasSize.width, height: canvasSize.height - bandHeight)
-        photo.aspectFilled(in: photoRect, context: context)
+        let inset = geo.photoRect.width * 0.06
+        let bracketRect = geo.photoRect.insetBy(dx: inset, dy: inset)
+        guard bracketRect.width > 0, bracketRect.height > 0 else { return }
 
-        let bandRect = CGRect(x: 0, y: photoRect.maxY, width: canvasSize.width, height: bandHeight)
-        background.setFill()
-        context.fill(bandRect)
+        let length = geo.unit * 3.5
+        let lineWidth = max(geo.unit * 0.18, 1)
+        context.cgContext.setStrokeColor(UIColor.Aperio.ink.withAlphaComponent(0.9).cgColor)
+        context.cgContext.setLineWidth(lineWidth)
 
-        let padding = canvasSize.width * 0.05
-        let cameraLine = exif.cameraAndLensLabel ?? "Cámara sin datos EXIF"
-        draw(
-            text: cameraLine,
-            in: CGRect(x: padding, y: bandRect.minY + padding * 0.5, width: canvasSize.width - padding * 2, height: bandHeight * 0.3),
-            font: .systemFont(ofSize: canvasSize.width * 0.026, weight: .semibold),
-            color: ink,
-            alignment: .left
-        )
+        let corners: [[CGPoint]] = [
+            [CGPoint(x: bracketRect.minX, y: bracketRect.minY + length),
+             CGPoint(x: bracketRect.minX, y: bracketRect.minY),
+             CGPoint(x: bracketRect.minX + length, y: bracketRect.minY)],
+            [CGPoint(x: bracketRect.maxX - length, y: bracketRect.minY),
+             CGPoint(x: bracketRect.maxX, y: bracketRect.minY),
+             CGPoint(x: bracketRect.maxX, y: bracketRect.minY + length)],
+            [CGPoint(x: bracketRect.maxX, y: bracketRect.maxY - length),
+             CGPoint(x: bracketRect.maxX, y: bracketRect.maxY),
+             CGPoint(x: bracketRect.maxX - length, y: bracketRect.maxY)],
+            [CGPoint(x: bracketRect.minX + length, y: bracketRect.maxY),
+             CGPoint(x: bracketRect.minX, y: bracketRect.maxY),
+             CGPoint(x: bracketRect.minX, y: bracketRect.maxY - length)],
+        ]
+        for corner in corners {
+            context.cgContext.addLines(between: corner)
+        }
+        context.cgContext.strokePath()
 
-        let stats = statFields(exif: exif, configuration: configuration)
-        let columnWidth = (canvasSize.width - padding * 2) / CGFloat(max(stats.count, 1))
-        for (index, stat) in stats.enumerated() {
-            let columnRect = CGRect(
-                x: padding + columnWidth * CGFloat(index),
-                y: bandRect.minY + bandHeight * 0.5,
-                width: columnWidth,
-                height: bandHeight * 0.4
-            )
+        var cursor = geo.dataRect.midY - geo.unit * 4
+        let left = geo.unit * 8
+        let maxWidth = geo.canvas.width * 0.72
+
+        if let camera = content.cameraLine {
+            let font = UIFont.monospacedSystemFont(ofSize: geo.unit * 2.4 * configuration.textScaleValue, weight: .regular)
+            draw(camera.uppercased(), at: CGPoint(x: left, y: cursor), width: maxWidth, font: font, color: UIColor.Aperio.ink, alignment: .left)
+            cursor += font.lineHeight + geo.unit * 0.6
+        }
+
+        let settingsFont = UIFont.monospacedSystemFont(ofSize: geo.unit * 2.1 * configuration.textScaleValue, weight: .regular)
+        draw(content.settingsLine, at: CGPoint(x: left, y: cursor), width: maxWidth, font: settingsFont, color: dataColor(configuration), alignment: .left)
+        cursor += settingsFont.lineHeight + geo.unit * 0.6
+
+        if let credit = content.credit {
+            let font = serifFont(ofSize: geo.unit * 2.2 * configuration.textScaleValue, italic: true)
+            draw(credit, at: CGPoint(x: left, y: cursor), width: maxWidth, font: font, color: UIColor.Aperio.ink.withAlphaComponent(0.85), alignment: .left)
+        }
+
+        if content.showWatermark {
+            // Va a la derecha, del lado opuesto a la lectura técnica, para que
+            // las dos esquinas del bloque de datos queden balanceadas.
+            let font = UIFont.monospacedSystemFont(ofSize: geo.unit * 1.5, weight: .regular)
             draw(
-                text: "\(stat.label)\n\(stat.value)",
-                in: columnRect,
-                font: .monospacedSystemFont(ofSize: canvasSize.width * 0.022, weight: .regular),
-                color: ink,
-                alignment: .left
+                "Aperio",
+                at: CGPoint(x: left, y: geo.dataRect.midY - geo.unit * 1),
+                width: geo.canvas.width - left * 2,
+                font: font,
+                color: UIColor.Aperio.ink.withAlphaComponent(0.5),
+                alignment: .right
             )
         }
     }
 
-    // MARK: - Esquina: sin marco, datos en una esquina translúcida
+    // MARK: - Claqueta
 
-    private static func drawEsquina(
-        photo: UIImage,
-        exif: ExifData,
+    private static func drawClaqueta(
+        geo: FrameGeometry,
+        content: FrameContent,
         configuration: FrameConfiguration,
-        canvasSize: CGSize,
-        isDarkFrame: Bool,
         context: UIGraphicsImageRendererContext
     ) {
-        let photoRect = CGRect(origin: .zero, size: canvasSize)
-        photo.aspectFilled(in: photoRect, context: context)
+        let bar = geo.hasBand
+            ? geo.bandRect
+            : CGRect(
+                x: 0,
+                y: geo.canvas.height - geo.canvas.height * 0.20,
+                width: geo.canvas.width,
+                height: geo.canvas.height * 0.20
+            )
 
-        let padding = canvasSize.width * 0.035
-        let scrimWidth = canvasSize.width * 0.62
-        let scrimHeight = canvasSize.height * 0.09
-        let scrimRect = CGRect(x: padding, y: canvasSize.height - scrimHeight - padding, width: scrimWidth, height: scrimHeight)
+        // Con banda el fondo ya es negro sólido; sin banda hace falta opacar la foto.
+        if !geo.hasBand {
+            UIColor.black.withAlphaComponent(0.82).setFill()
+            context.fill(bar)
+        } else {
+            UIColor.Aperio.void.setFill()
+            context.fill(bar)
+        }
 
-        let scrimColor = isDarkFrame ? UIColor.black.withAlphaComponent(0.55) : UIColor.white.withAlphaComponent(0.72)
-        let textColor: UIColor = isDarkFrame ? .white : .black
-        let path = UIBezierPath(roundedRect: scrimRect, cornerRadius: 6)
-        scrimColor.setFill()
-        path.fill()
+        UIColor.Aperio.accent.setFill()
+        context.fill(CGRect(x: bar.minX, y: bar.minY, width: bar.width, height: max(geo.unit * 0.4, 1)))
 
-        draw(
-            text: "\(exif.cameraAndLensLabel ?? "")\n\(settingsLine(exif: exif, configuration: configuration))",
-            in: scrimRect.insetBy(dx: 10, dy: 6),
-            font: .monospacedSystemFont(ofSize: canvasSize.width * 0.02, weight: .regular),
-            color: textColor,
-            alignment: .left
-        )
+        let padding = geo.unit * 7
+        let labelFont = UIFont.monospacedSystemFont(ofSize: geo.unit * 1.5 * configuration.textScaleValue, weight: .regular)
+        let valueFont = UIFont.monospacedSystemFont(ofSize: geo.unit * 2.3 * configuration.textScaleValue, weight: .semibold)
+        let blockHeight = labelFont.lineHeight + valueFont.lineHeight + geo.unit * 0.4
+        let top = bar.midY - blockHeight / 2
+
+        var x = bar.minX + padding
+        let columnWidth = max((bar.width - padding * 2) / CGFloat(max(content.stats.count, 1)) - geo.unit * 2, geo.unit * 10)
+
+        for stat in content.stats {
+            draw(stat.label, at: CGPoint(x: x, y: top), width: columnWidth, font: labelFont, color: UIColor.Aperio.accent, alignment: .left)
+            draw(stat.value, at: CGPoint(x: x, y: top + labelFont.lineHeight + geo.unit * 0.4), width: columnWidth, font: valueFont, color: UIColor.Aperio.ink, alignment: .left)
+            x += columnWidth + geo.unit * 2
+        }
+
+        var rightCursor = top
+        let rightWidth = geo.canvas.width * 0.3
+        let rightX = bar.maxX - padding - rightWidth
+
+        if let credit = content.credit {
+            let font = serifFont(ofSize: geo.unit * 2.2 * configuration.textScaleValue, italic: true)
+            draw(credit, at: CGPoint(x: rightX, y: rightCursor), width: rightWidth, font: font, color: UIColor.Aperio.ink.withAlphaComponent(0.85), alignment: .right)
+            rightCursor += font.lineHeight + geo.unit * 0.4
+        }
+        if content.showWatermark {
+            let font = UIFont.monospacedSystemFont(ofSize: geo.unit * 1.5, weight: .regular)
+            draw("Aperio", at: CGPoint(x: rightX, y: rightCursor), width: rightWidth, font: font, color: UIColor.Aperio.ink.withAlphaComponent(0.5), alignment: .right)
+        }
     }
 
-    private static func drawWatermark(canvasSize: CGSize, ink: UIColor, context: UIGraphicsImageRendererContext) {
-        draw(
-            text: "Aperio",
-            in: CGRect(x: canvasSize.width - 120, y: canvasSize.height - 32, width: 110, height: 20),
-            font: .systemFont(ofSize: 12, weight: .medium),
-            color: ink.withAlphaComponent(0.55),
-            alignment: .right
-        )
+    // MARK: - Créditos
+
+    private static func drawCreditos(
+        geo: FrameGeometry,
+        content: FrameContent,
+        configuration: FrameConfiguration,
+        context: UIGraphicsImageRendererContext
+    ) {
+        let width = geo.canvas.width * 0.88
+        let x = geo.canvas.width * 0.06
+        var cursor = geo.dataRect.midY - geo.unit * 5
+
+        if let camera = content.cameraLine {
+            let font = serifFont(ofSize: geo.unit * 3.2 * configuration.textScaleValue, italic: true)
+            draw(camera, at: CGPoint(x: x, y: cursor), width: width, font: font, color: UIColor.Aperio.ink, alignment: .center)
+            cursor += font.lineHeight + geo.unit * 0.8
+        }
+
+        let settingsFont = UIFont.monospacedSystemFont(ofSize: geo.unit * 1.9 * configuration.textScaleValue, weight: .regular)
+        draw(content.settingsLine, at: CGPoint(x: x, y: cursor), width: width, font: settingsFont, color: dataColor(configuration), alignment: .center)
+        cursor += settingsFont.lineHeight + geo.unit * 0.8
+
+        if let credit = content.credit {
+            let font = serifFont(ofSize: geo.unit * 2.2 * configuration.textScaleValue, italic: true)
+            draw(credit, at: CGPoint(x: x, y: cursor), width: width, font: font, color: UIColor.Aperio.ink.withAlphaComponent(0.85), alignment: .center)
+            cursor += font.lineHeight + geo.unit * 0.8
+        }
+
+        if content.showWatermark {
+            let font = UIFont.monospacedSystemFont(ofSize: geo.unit * 1.5, weight: .regular)
+            draw("Aperio", at: CGPoint(x: x, y: cursor), width: width, font: font, color: UIColor.Aperio.ink.withAlphaComponent(0.5), alignment: .center)
+        }
     }
 
     // MARK: - Helpers
 
-    private struct Stat { let label: String; let value: String }
-
-    private static func statFields(exif: ExifData, configuration: FrameConfiguration) -> [Stat] {
-        var stats: [Stat] = []
-        let fields = configuration.visibleFields
-        if fields.iso, let value = exif.isoLabel { stats.append(Stat(label: "ISO", value: value)) }
-        if fields.aperture, let value = exif.apertureLabel { stats.append(Stat(label: "APERTURA", value: value)) }
-        if fields.shutterSpeed, let value = exif.shutterSpeed { stats.append(Stat(label: "VELOCIDAD", value: value)) }
-        if fields.focalLength, let value = exif.focalLengthLabel { stats.append(Stat(label: "FOCAL", value: value)) }
-        return stats
+    /// Serif del sistema (New York), el equivalente de `Theme.Font.display`.
+    /// `UIFont.systemFont` da la sans, así que hay que pedir el diseño serif
+    /// explícitamente o la exportación no coincide con la vista previa.
+    private static func serifFont(ofSize size: CGFloat, italic: Bool = false) -> UIFont {
+        let base = UIFont.systemFont(ofSize: size)
+        var descriptor = base.fontDescriptor
+        if let serif = descriptor.withDesign(.serif) { descriptor = serif }
+        if italic, let italicized = descriptor.withSymbolicTraits(descriptor.symbolicTraits.union(.traitItalic)) {
+            descriptor = italicized
+        }
+        return UIFont(descriptor: descriptor, size: size)
     }
 
-    private static func settingsLine(exif: ExifData, configuration: FrameConfiguration) -> String {
-        let fields = configuration.visibleFields
-        var parts: [String] = []
-        if fields.focalLength, let value = exif.focalLengthLabel { parts.append(value) }
-        if fields.aperture, let value = exif.apertureLabel { parts.append(value) }
-        if fields.shutterSpeed, let value = exif.shutterSpeed { parts.append(value) }
-        if fields.iso, let value = exif.isoLabel { parts.append(value) }
-        return parts.joined(separator: " · ")
-    }
-
-    private static func draw(
-        text: String,
-        centeredIn rect: CGRect,
-        font: UIFont,
-        color: UIColor
-    ) {
-        draw(text: text, in: rect, font: font, color: color, alignment: .center)
+    private static func dataColor(_ configuration: FrameConfiguration) -> UIColor {
+        switch configuration.accent {
+        case .neutro: return UIColor.Aperio.ink.withAlphaComponent(0.75)
+        case .ambar: return UIColor.Aperio.accent
+        case .blanco: return UIColor.Aperio.ink
+        }
     }
 
     private static func draw(
-        text: String,
-        in rect: CGRect,
+        _ text: String,
+        at origin: CGPoint,
+        width: CGFloat,
         font: UIFont,
         color: UIColor,
         alignment: NSTextAlignment
     ) {
-        let paragraphStyle = NSMutableParagraphStyle()
-        paragraphStyle.alignment = alignment
+        guard !text.isEmpty, width > 0 else { return }
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = alignment
+        paragraph.lineBreakMode = .byTruncatingTail
         let attributes: [NSAttributedString.Key: Any] = [
             .font: font,
             .foregroundColor: color,
-            .paragraphStyle: paragraphStyle,
+            .paragraphStyle: paragraph,
         ]
+        let rect = CGRect(x: origin.x, y: origin.y, width: width, height: font.lineHeight * 1.3)
         (text as NSString).draw(in: rect, withAttributes: attributes)
     }
 }
 
 private extension UIImage {
-    /// Dibuja la imagen recortada para llenar `rect` sin deformarla (equivalente a `aspectRatio(.fill)`).
-    func aspectFilled(in rect: CGRect, context: UIGraphicsImageRendererContext) {
+    /// Dibuja la imagen llenando `rect` sin deformarla, recortando el sobrante.
+    func drawAspectFilled(in rect: CGRect, context: UIGraphicsImageRendererContext) {
+        guard rect.width > 0, rect.height > 0, size.width > 0, size.height > 0 else { return }
+
         context.cgContext.saveGState()
         context.cgContext.clip(to: rect)
 
         let imageAspect = size.width / size.height
         let rectAspect = rect.width / rect.height
-        var drawRect = rect
+        let drawRect: CGRect
 
         if imageAspect > rectAspect {
             let scaledWidth = rect.height * imageAspect
@@ -241,19 +295,5 @@ private extension UIImage {
 
         draw(in: drawRect)
         context.cgContext.restoreGState()
-    }
-}
-
-private extension UIColor {
-    /// Tono de marco en el eje claro-oscuro de la marca (papel cálido / tinta cálida),
-    /// interpolado linealmente según `position` (0 = claro, 1 = oscuro).
-    static func frameTone(atPosition position: Double) -> UIColor {
-        let light = (r: Double(0xF7), g: Double(0xF5), b: Double(0xF0))
-        let dark = (r: Double(0x17), g: Double(0x14), b: Double(0x0F))
-        let t = min(max(position, 0), 1)
-        let r = (light.r + (dark.r - light.r) * t) / 255
-        let g = (light.g + (dark.g - light.g) * t) / 255
-        let b = (light.b + (dark.b - light.b) * t) / 255
-        return UIColor(red: CGFloat(r), green: CGFloat(g), blue: CGFloat(b), alpha: 1)
     }
 }

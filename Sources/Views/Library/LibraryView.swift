@@ -9,15 +9,15 @@ struct LibraryView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Theme.paper.ignoresSafeArea()
+                Theme.void.ignoresSafeArea()
 
                 if libraryStore.savedFrames.isEmpty {
                     ContentUnavailableView {
-                        Label("Todavía no hay frames", systemImage: "photo.on.rectangle.angled")
+                        Label("Todavía no hay fotos", systemImage: "photo.on.rectangle.angled")
                     } description: {
-                        Text("Elige una foto para armar el primero.")
+                        Text("Elige una foto para armar la primera.")
                     } actions: {
-                        Button("Nuevo frame") { isShowingPicker = true }
+                        Button("Nueva foto") { isShowingPicker = true }
                             .buttonStyle(.borderedProminent)
                             .tint(Theme.ink)
                     }
@@ -76,7 +76,7 @@ private struct AsyncFileImage: View {
             if let image {
                 Image(uiImage: image).resizable()
             } else {
-                Theme.paperRaised
+                Theme.panelRaised
             }
         }
         .task {

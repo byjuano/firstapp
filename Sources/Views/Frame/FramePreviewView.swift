@@ -1,175 +1,238 @@
 import SwiftUI
 
-/// Preview en vivo del frame dentro del editor. Redibuja el mismo diseño que
-/// `FrameRenderer` compone para exportar, pero con vistas de SwiftUI en vez de
-/// Core Graphics, para que reaccione al instante a los cambios de los controles.
+/// Vista previa en vivo de la composición.
+///
+/// Recibe un `size` ya resuelto en vez de calcularlo con `aspectRatio`: dentro
+/// de un `ScrollView`, `aspectRatio` puede dimensionarse contra el tamaño ideal
+/// del contenido y no contra el ancho disponible, lo que recorta la vista y
+/// hace que cambiar de formato no se refleje.
 struct FramePreviewView: View {
     let photo: UIImage
     let exif: ExifData
     let configuration: FrameConfiguration
     let isPro: Bool
+    let size: CGSize
 
-    private var effectiveColorPosition: Double {
-        isPro ? configuration.color.position : configuration.color.clampedToFreeTier().position
-    }
+    private var resolved: FrameConfiguration { configuration.resolved(isPro: isPro) }
 
-    private var isDarkFrame: Bool { effectiveColorPosition >= 0.5 }
-
-    private var backgroundTone: Color {
-        Color(
-            red: (isDarkFrame ? Double(0x17) : Double(0xF7)) / 255,
-            green: (isDarkFrame ? Double(0x14) : Double(0xF5)) / 255,
-            blue: (isDarkFrame ? Double(0x0F) : Double(0xF0)) / 255
+    private var geometry: FrameGeometry {
+        FrameGeometry.compute(
+            canvas: size,
+            photoAspect: photo.size.height > 0 ? photo.size.width / photo.size.height : 1,
+            configuration: resolved
         )
     }
 
-    private var inkTone: Color { isDarkFrame ? .white : Theme.ink }
+    private var content: FrameContent {
+        FrameContent(exif: exif, configuration: configuration, isPro: isPro)
+    }
+
+    /// Color de la línea de datos según el tinte elegido en Pro.
+    private var dataTextColor: Color {
+        switch resolved.accent {
+        case .neutro: return Theme.ink.opacity(0.75)
+        case .ambar: return Theme.accent
+        case .blanco: return Theme.ink
+        }
+    }
 
     var body: some View {
-        VStack(spacing: 0) {
-            switch configuration.layout {
-            case .linea: lineaBody
-            case .ficha: fichaBody
-            case .esquina: esquinaBody
-            }
-        }
-        .aspectRatio(configuration.format.aspectRatio, contentMode: .fit)
-        .background(backgroundTone)
-        .overlay(alignment: .bottomTrailing) {
-            if !isPro {
-                Text("Aperio")
-                    .font(Theme.Font.mono(9))
-                    .foregroundStyle(inkTone.opacity(0.5))
-                    .padding(8)
-            }
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 4))
-    }
+        let geo = geometry
 
-    private var margin: CGFloat {
-        let fraction = isPro ? configuration.sizeFraction : FrameConfiguration.defaultFreeSize
-        return 6 + fraction * 14
-    }
+        ZStack(alignment: .topLeading) {
+            Theme.void
 
-    // MARK: - Línea
-
-    private var lineaBody: some View {
-        VStack(spacing: margin * 0.6) {
             Image(uiImage: photo)
                 .resizable()
                 .scaledToFill()
+                .frame(width: geo.photoRect.width, height: geo.photoRect.height)
                 .clipped()
-                .overlay(RoundedRectangle(cornerRadius: 1).stroke(inkTone.opacity(0.9), lineWidth: 1))
-                .padding(margin)
+                .offset(x: geo.photoRect.minX, y: geo.photoRect.minY)
 
-            VStack(spacing: 3) {
-                if let camera = exif.cameraModel {
+            if geo.needsScrim {
+                LinearGradient(
+                    colors: [.black.opacity(0.82), .clear],
+                    startPoint: .bottom,
+                    endPoint: .top
+                )
+                .frame(height: geo.canvas.height * 0.36)
+                .offset(y: geo.canvas.height * 0.64)
+                .allowsHitTesting(false)
+            }
+
+            switch resolved.layout {
+            case .visor: visorOverlay(geo)
+            case .claqueta: claquetaOverlay(geo)
+            case .creditos: creditosOverlay(geo)
+            }
+        }
+        .frame(width: size.width, height: size.height)
+        .clipped()
+    }
+
+    // MARK: - Visor
+
+    /// Los brackets abrazan la foto, no el lienzo: son parte del encuadre de la
+    /// toma, así que cuando hay bandas siguen a la imagen.
+    private func visorOverlay(_ geo: FrameGeometry) -> some View {
+        let inset = geo.photoRect.width * 0.06
+
+        return ZStack(alignment: .topLeading) {
+            CornerBrackets(length: geo.unit * 3.5)
+                .stroke(Theme.ink.opacity(0.9), lineWidth: max(geo.unit * 0.18, 0.5))
+                .frame(
+                    width: max(geo.photoRect.width - inset * 2, 1),
+                    height: max(geo.photoRect.height - inset * 2, 1)
+                )
+                .offset(x: geo.photoRect.minX + inset, y: geo.photoRect.minY + inset)
+
+            VStack(alignment: .leading, spacing: geo.unit * 0.6) {
+                if let camera = content.cameraLine {
                     Text(camera.uppercased())
-                        .font(Theme.Font.mono(8))
-                        .tracking(1.2)
-                        .foregroundStyle(inkTone.opacity(0.65))
+                        .font(Theme.Font.mono(geo.unit * 2.4 * resolved.textScaleValue))
+                        .foregroundStyle(Theme.ink)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.7)
+                        .minimumScaleFactor(0.6)
                 }
-                Text(settingsLine)
-                    .font(Theme.Font.mono(11))
-                    .foregroundStyle(inkTone)
+                Text(content.settingsLine)
+                    .font(Theme.Font.mono(geo.unit * 2.1 * resolved.textScaleValue))
+                    .foregroundStyle(dataTextColor)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                    .minimumScaleFactor(0.6)
+                creditLine(geo)
             }
-            .padding(.horizontal, 6)
-            .padding(.bottom, margin)
+            .frame(width: geo.canvas.width * 0.72, alignment: .leading)
+            .offset(x: geo.unit * 8, y: geo.dataRect.midY - geo.unit * 4)
+
+            if content.showWatermark {
+                watermark(geo)
+                    .frame(width: geo.canvas.width, alignment: .trailing)
+                    .offset(x: -geo.unit * 8, y: geo.dataRect.midY - geo.unit * 1)
+            }
         }
     }
 
-    // MARK: - Ficha
+    // MARK: - Claqueta
 
-    private var fichaBody: some View {
-        VStack(spacing: 0) {
-            Image(uiImage: photo)
-                .resizable()
-                .scaledToFill()
-                .clipped()
-                .layoutPriority(1)
+    /// Con bandas, la franja y la banda son el mismo rectángulo: no hay
+    /// superposición sobre la foto ni espacio desaprovechado.
+    private func claquetaOverlay(_ geo: FrameGeometry) -> some View {
+        let bar = geo.hasBand
+            ? geo.bandRect
+            : CGRect(
+                x: 0,
+                y: geo.canvas.height - geo.canvas.height * 0.20,
+                width: geo.canvas.width,
+                height: geo.canvas.height * 0.20
+            )
 
-            VStack(alignment: .leading, spacing: 8) {
-                if let cameraLine = exif.cameraAndLensLabel {
-                    Text(cameraLine)
-                        .font(Theme.Font.display(13))
-                        .italic()
-                        .foregroundStyle(inkTone)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                }
-                HStack(spacing: 14) {
-                    ForEach(statFields, id: \.label) { stat in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(stat.label)
-                                .font(Theme.Font.mono(7))
-                                .tracking(0.8)
-                                .foregroundStyle(inkTone.opacity(0.6))
-                                .lineLimit(1)
-                            Text(stat.value)
-                                .font(Theme.Font.mono(11))
-                                .foregroundStyle(inkTone)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.7)
-                        }
+        return VStack(spacing: 0) {
+            Rectangle()
+                .fill(Theme.accent)
+                .frame(height: max(geo.unit * 0.4, 1))
+
+            HStack(alignment: .center, spacing: geo.unit * 4) {
+                ForEach(content.stats) { stat in
+                    VStack(alignment: .leading, spacing: geo.unit * 0.4) {
+                        Text(stat.label)
+                            .font(Theme.Font.mono(geo.unit * 1.5 * resolved.textScaleValue))
+                            .foregroundStyle(Theme.accent)
+                            .lineLimit(1)
+                        Text(stat.value)
+                            .font(Theme.Font.mono(geo.unit * 2.3 * resolved.textScaleValue, weight: .semibold))
+                            .foregroundStyle(Theme.ink)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
                     }
                 }
-            }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(backgroundTone)
-        }
-    }
 
-    // MARK: - Esquina
+                Spacer(minLength: 0)
 
-    private var esquinaBody: some View {
-        ZStack(alignment: .bottomLeading) {
-            Image(uiImage: photo)
-                .resizable()
-                .scaledToFill()
-                .clipped()
-
-            VStack(alignment: .leading, spacing: 2) {
-                if let camera = exif.cameraAndLensLabel {
-                    Text(camera)
-                        .font(Theme.Font.display(10))
-                        .italic()
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
+                VStack(alignment: .trailing, spacing: geo.unit * 0.4) {
+                    creditLine(geo)
+                    if content.showWatermark { watermark(geo) }
                 }
-                Text(settingsLine)
-                    .font(Theme.Font.mono(8))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
             }
-            .foregroundStyle(isDarkFrame ? .white : .black)
-            .padding(8)
-            .frame(maxWidth: 200, alignment: .leading)
-            .background(.ultraThinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 4))
-            .padding(10)
+            .padding(.horizontal, geo.unit * 7)
+            .frame(maxHeight: .infinity)
+        }
+        .frame(width: bar.width, height: bar.height)
+        .background(geo.hasBand ? Theme.void : Color.black.opacity(0.82))
+        .offset(y: bar.minY)
+    }
+
+    // MARK: - Créditos
+
+    private func creditosOverlay(_ geo: FrameGeometry) -> some View {
+        VStack(spacing: geo.unit * 0.8) {
+            if let camera = content.cameraLine {
+                Text(camera)
+                    .font(Theme.Font.display(geo.unit * 3.2 * resolved.textScaleValue))
+                    .italic()
+                    .foregroundStyle(Theme.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+            }
+            Text(content.settingsLine)
+                .font(Theme.Font.mono(geo.unit * 1.9 * resolved.textScaleValue))
+                .foregroundStyle(dataTextColor)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+            creditLine(geo)
+            if content.showWatermark { watermark(geo) }
+        }
+        .multilineTextAlignment(.center)
+        .frame(width: geo.canvas.width * 0.88)
+        .offset(x: geo.canvas.width * 0.06, y: geo.dataRect.midY - geo.unit * 5)
+    }
+
+    // MARK: - Piezas compartidas
+
+    @ViewBuilder
+    private func creditLine(_ geo: FrameGeometry) -> some View {
+        if let credit = content.credit {
+            Text(credit)
+                .font(Theme.Font.display(geo.unit * 2.2 * resolved.textScaleValue))
+                .italic()
+                .foregroundStyle(Theme.ink.opacity(0.85))
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
         }
     }
 
-    // MARK: - Data helpers
-
-    private struct Stat { let label: String; let value: String }
-
-    private var statFields: [Stat] {
-        var stats: [Stat] = []
-        let fields = configuration.visibleFields
-        if fields.iso, let value = exif.isoLabel { stats.append(Stat(label: "ISO", value: value)) }
-        if fields.aperture, let value = exif.apertureLabel { stats.append(Stat(label: "APERTURA", value: value)) }
-        if fields.shutterSpeed, let value = exif.shutterSpeed { stats.append(Stat(label: "VELOCIDAD", value: value)) }
-        if fields.focalLength, let value = exif.focalLengthLabel { stats.append(Stat(label: "FOCAL", value: value)) }
-        return stats
+    private func watermark(_ geo: FrameGeometry) -> some View {
+        Text("Aperio")
+            .font(Theme.Font.mono(geo.unit * 1.5))
+            .tracking(geo.unit * 0.12)
+            .foregroundStyle(Theme.ink.opacity(0.5))
     }
+}
 
-    private var settingsLine: String {
-        statFields.map(\.value).joined(separator: " · ")
+/// Cuatro brackets de esquina, sin los lados. Es la forma del punto de enfoque
+/// de un visor: sugiere el encuadre sin encerrar la foto en un marco.
+private struct CornerBrackets: Shape {
+    let length: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let l = min(length, min(rect.width, rect.height) / 2)
+
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY + l))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.minX + l, y: rect.minY))
+
+        path.move(to: CGPoint(x: rect.maxX - l, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + l))
+
+        path.move(to: CGPoint(x: rect.maxX, y: rect.maxY - l))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.maxX - l, y: rect.maxY))
+
+        path.move(to: CGPoint(x: rect.minX + l, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY - l))
+
+        return path
     }
 }

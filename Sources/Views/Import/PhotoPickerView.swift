@@ -10,7 +10,7 @@ struct PhotoPickerView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Theme.paper.ignoresSafeArea()
+                Theme.void.ignoresSafeArea()
 
                 PhotosPicker(selection: $selection, matching: .images) {
                     VStack(spacing: 12) {
