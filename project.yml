@@ -24,6 +24,7 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ENABLE_PREVIEWS: true
     info:
+      path: Sources/App/Info.plist
       properties:
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
