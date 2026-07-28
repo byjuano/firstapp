@@ -12,12 +12,15 @@ struct LibraryView: View {
                 Theme.paper.ignoresSafeArea()
 
                 if libraryStore.savedFrames.isEmpty {
-                    ContentUnavailableFallback(
-                        title: "Todavía no hay frames",
-                        message: "Elige una foto para armar el primero.",
-                        actionTitle: "Nuevo frame",
-                        action: { isShowingPicker = true }
-                    )
+                    ContentUnavailableView {
+                        Label("Todavía no hay frames", systemImage: "photo.on.rectangle.angled")
+                    } description: {
+                        Text("Elige una foto para armar el primero.")
+                    } actions: {
+                        Button("Nuevo frame") { isShowingPicker = true }
+                            .buttonStyle(.borderedProminent)
+                            .tint(Theme.ink)
+                    }
                 } else {
                     ScrollView {
                         LazyVGrid(columns: columns, spacing: 12) {
@@ -79,35 +82,6 @@ private struct AsyncFileImage: View {
         .task {
             image = UIImage(contentsOfFile: url.path)
         }
-    }
-}
-
-/// Estado vacío simple. `ContentUnavailableView` (iOS 17+) sería la opción nativa;
-/// esta versión propia mantiene compatibilidad con el deploymentTarget 16.0 del proyecto.
-private struct ContentUnavailableFallback: View {
-    let title: String
-    let message: String
-    let actionTitle: String
-    let action: () -> Void
-
-    var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "photo.on.rectangle.angled")
-                .font(.system(size: 44))
-                .foregroundStyle(Theme.inkSoft)
-            Text(title)
-                .font(Theme.Font.display(20))
-                .italic()
-            Text(message)
-                .font(.subheadline)
-                .foregroundStyle(Theme.inkSoft)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
-            Button(actionTitle, action: action)
-                .buttonStyle(.borderedProminent)
-                .tint(Theme.ink)
-        }
-        .foregroundStyle(Theme.ink)
     }
 }
 
