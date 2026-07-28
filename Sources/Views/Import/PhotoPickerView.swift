@@ -59,10 +59,13 @@ struct PhotoPickerView: View {
     }
 }
 
-private struct LoadedPhoto: Identifiable {
+private struct LoadedPhoto: Identifiable, Hashable {
     let id = UUID()
     let image: UIImage
     let exif: ExifData
+
+    static func == (lhs: LoadedPhoto, rhs: LoadedPhoto) -> Bool { lhs.id == rhs.id }
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
 
 #Preview {
